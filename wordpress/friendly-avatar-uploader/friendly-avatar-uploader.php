@@ -44,3 +44,25 @@ add_action(
 		new FAU_Profile_Page();
 	}
 );
+
+/**
+ * Enqueue Jcrop on front-end pages that contain one of the plugin's
+ * shortcodes. Jcrop ships with WordPress core under the 'jcrop' handle
+ * for both the script and the stylesheet — no CDN, no bundled copy.
+ */
+add_action(
+	'wp_enqueue_scripts',
+	static function () {
+		$post = get_post();
+		if ( ! $post ) {
+			return;
+		}
+		if (
+			has_shortcode( $post->post_content, 'friendly_avatar_upload' )
+			|| has_shortcode( $post->post_content, 'friendly_profile_page' )
+		) {
+			wp_enqueue_style( 'jcrop' );
+			wp_enqueue_script( 'jcrop' );
+		}
+	}
+);

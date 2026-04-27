@@ -295,6 +295,10 @@ class FAU_Shortcode {
 				var backdrop   = modal ? modal.querySelector('.fau-crop-modal__backdrop') : null;
 				var nonceField = form ? form.querySelector('input[name="fau_nonce"]') : null;
 				var jcropApi   = null;
+				var srcNaturalW = 0;
+				var srcNaturalH = 0;
+				var srcDisplayW = 0;
+				var srcDisplayH = 0;
 
 				function setMessage(text, kind) {
 					msg.textContent = text || '';
@@ -309,8 +313,12 @@ class FAU_Shortcode {
 				function openModal(dataUrl) {
 					modalImg.onload = function () {
 						modal.removeAttribute('hidden');
-						var imgW = modalImg.width;
-						var imgH = modalImg.height;
+						srcNaturalW = modalImg.naturalWidth;
+						srcNaturalH = modalImg.naturalHeight;
+						srcDisplayW = modalImg.width || modalImg.offsetWidth;
+						srcDisplayH = modalImg.height || modalImg.offsetHeight;
+						var imgW = srcDisplayW;
+						var imgH = srcDisplayH;
 						var selSize = Math.round( Math.min(imgW, imgH) * 0.8 );
 						var selX = Math.round( (imgW - selSize) / 2 );
 						var selY = Math.round( (imgH - selSize) / 2 );
@@ -335,6 +343,10 @@ class FAU_Shortcode {
 						try { jcropApi.destroy(); } catch (e) {}
 						jcropApi = null;
 					}
+					srcNaturalW = 0;
+					srcNaturalH = 0;
+					srcDisplayW = 0;
+					srcDisplayH = 0;
 					if ( modal ) { modal.setAttribute('hidden', ''); }
 					if ( modalImg ) { modalImg.removeAttribute('src'); }
 				}
@@ -381,12 +393,19 @@ class FAU_Shortcode {
 					var coords = jcropApi.tellSelect();
 					if ( ! coords || ! coords.w ) { closeModal(); return; }
 
-					var naturalW = modalImg.naturalWidth;
-					var naturalH = modalImg.naturalHeight;
-					var displayW = modalImg.width;
-					var displayH = modalImg.height;
-					var scaleX   = naturalW / displayW;
-					var scaleY   = naturalH / displayH;
+					var bounds = jcropApi.getBounds();
+					var jcropW = bounds ? bounds[0] : 0;
+					var jcropH = bounds ? bounds[1] : 0;
+
+					if ( ! srcNaturalW || ! srcNaturalH || ! jcropW || ! jcropH ) {
+						closeModal();
+						if ( fileIn ) { fileIn.value = ''; }
+						setMessage(<?php echo wp_json_encode( __( 'Could not process the image.', 'friendly-avatar-uploader' ) ); ?>, 'error');
+						return;
+					}
+
+					var scaleX = srcNaturalW / jcropW;
+					var scaleY = srcNaturalH / jcropH;
 
 					var canvas = document.createElement('canvas');
 					canvas.width  = targetSize;

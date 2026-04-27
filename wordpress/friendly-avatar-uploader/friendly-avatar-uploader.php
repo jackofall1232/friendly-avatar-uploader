@@ -30,6 +30,7 @@ define( 'FAU_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 require_once FAU_PLUGIN_DIR . 'includes/class-fau-avatar-filter.php';
 require_once FAU_PLUGIN_DIR . 'includes/class-fau-shortcode.php';
 require_once FAU_PLUGIN_DIR . 'includes/class-fau-ajax.php';
+require_once FAU_PLUGIN_DIR . 'includes/class-fau-profile-page.php';
 
 /**
  * Bootstrap the plugin once WordPress core is ready.
@@ -40,5 +41,6 @@ add_action(
 		new FAU_Avatar_Filter();
 		new FAU_Shortcode();
 		new FAU_Ajax();
+		new FAU_Profile_Page();
 	}
 );

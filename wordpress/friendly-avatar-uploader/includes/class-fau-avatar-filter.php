@@ -2,18 +2,18 @@
 /**
  * Filters core avatar resolution to use the custom uploaded avatar.
  *
- * @package ZillHa\AvatarUpload
+ * @package FriendlyAvatarUploader
  */
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Class ZAU_Avatar_Filter
+ * Class FAU_Avatar_Filter
  *
  * Hooks into pre_get_avatar_data so that any call to get_avatar() or
  * get_avatar_url() returns the user's uploaded avatar when one exists.
  */
-class ZAU_Avatar_Filter {
+class FAU_Avatar_Filter {
 
 	/**
 	 * Constructor: register the filter.
@@ -36,7 +36,7 @@ class ZAU_Avatar_Filter {
 			return $args;
 		}
 
-		$custom_url = get_user_meta( $user_id, ZAU_META_KEY, true );
+		$custom_url = get_user_meta( $user_id, FAU_META_KEY, true );
 
 		if ( ! empty( $custom_url ) ) {
 			$args['url']           = $custom_url;

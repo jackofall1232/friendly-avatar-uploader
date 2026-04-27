@@ -115,7 +115,7 @@ class FAU_Profile_Page {
 				'count'   => true,
 			)
 		);
-		$member_since  = date_i18n( 'F Y', strtotime( $user->user_registered ) );
+		$member_since  = wp_date( 'F Y', strtotime( $user->user_registered ) );
 
 		$custom_url = get_user_meta( $user_id, FAU_META_KEY, true );
 		$avatar_url = $custom_url
@@ -214,9 +214,17 @@ class FAU_Profile_Page {
 	/**
 	 * Inline CSS scoped to .fau-profile-page.
 	 *
+	 * Emitted only on the first render per request — subsequent shortcode
+	 * instances on the same page reuse the already-output stylesheet.
+	 *
 	 * @return string
 	 */
 	protected function styles() {
+		static $emitted = false;
+		if ( $emitted ) {
+			return '';
+		}
+		$emitted = true;
 		ob_start();
 		?>
 		<style>
@@ -406,10 +414,19 @@ class FAU_Profile_Page {
 	/**
 	 * Inline JS that wires up live preview, AJAX upload, and AJAX remove.
 	 *
+	 * Emitted only on the first render per request — the script already
+	 * binds every `.fau-profile-page` it finds, so one copy handles all
+	 * instances on the page.
+	 *
 	 * @param string $ajax_url Resolved admin-ajax.php URL.
 	 * @return string
 	 */
 	protected function script( $ajax_url ) {
+		static $emitted = false;
+		if ( $emitted ) {
+			return '';
+		}
+		$emitted = true;
 		ob_start();
 		?>
 		<script>
@@ -536,7 +553,8 @@ class FAU_Profile_Page {
 			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
 		}
 		if ( 6 !== strlen( $hex ) || ! ctype_xdigit( $hex ) ) {
-			return '74, 144, 217';
+			$defaults = $this->fallback_defaults();
+			$hex      = ltrim( $defaults['accent'], '#' );
 		}
 		return sprintf(
 			'%d, %d, %d',

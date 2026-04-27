@@ -192,9 +192,9 @@ class FAU_Profile_Page {
 
 				<div class="fau-profile-page__panel">
 					<div class="fau-profile-page__actions">
-						<button type="submit" class="fau-profile-page__btn fau-profile-page__btn--primary">
+						<label for="<?php echo esc_attr( $file_id ); ?>" class="fau-profile-page__btn fau-profile-page__btn--primary">
 							<?php esc_html_e( 'Upload Avatar', 'friendly-avatar-uploader' ); ?>
-						</button>
+						</label>
 						<?php if ( $has_custom ) : ?>
 							<button type="button" class="fau-profile-page__btn fau-profile-page__btn--secondary fau-profile-page__remove">
 								<?php esc_html_e( 'Remove', 'friendly-avatar-uploader' ); ?>
@@ -449,13 +449,45 @@ class FAU_Profile_Page {
 				var preview = root.querySelector('.fau-profile-page__avatar');
 				var msg     = root.querySelector('.fau-profile-page__message');
 				var actions = root.querySelector('.fau-profile-page__actions');
-				var submit  = root.querySelector('.fau-profile-page__btn--primary');
 
 				function setMessage(text, kind) {
 					if ( ! msg ) { return; }
 					msg.textContent = text || '';
 					msg.classList.remove('is-success', 'is-error');
 					if ( kind ) { msg.classList.add('is-' + kind); }
+				}
+
+				function startUpload() {
+					if ( ! form || ! fileIn || ! fileIn.files || ! fileIn.files[0] ) { return; }
+					var data = new FormData(form);
+					fileIn.disabled = true;
+					setMessage(<?php echo wp_json_encode( __( 'Uploading…', 'friendly-avatar-uploader' ) ); ?>, '');
+
+					fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body: data })
+						.then(function (r) { return r.json(); })
+						.then(function (res) {
+							fileIn.disabled = false;
+							if ( res && res.success && res.data && res.data.url ) {
+								preview.src = res.data.url;
+								setMessage(res.data.message || '', 'success');
+								fileIn.value = '';
+								if ( ! root.querySelector('.fau-profile-page__remove') ) {
+									var rm = document.createElement('button');
+									rm.type = 'button';
+									rm.className = 'fau-profile-page__btn fau-profile-page__btn--secondary fau-profile-page__remove';
+									rm.textContent = <?php echo wp_json_encode( __( 'Remove', 'friendly-avatar-uploader' ) ); ?>;
+									actions.appendChild(rm);
+									bindRemove(rm);
+								}
+							} else {
+								var errMsg = (res && res.data && res.data.message) ? res.data.message : <?php echo wp_json_encode( __( 'Upload failed.', 'friendly-avatar-uploader' ) ); ?>;
+								setMessage(errMsg, 'error');
+							}
+						})
+						.catch(function () {
+							fileIn.disabled = false;
+							setMessage(<?php echo wp_json_encode( __( 'Network error. Please try again.', 'friendly-avatar-uploader' ) ); ?>, 'error');
+						});
 				}
 
 				if ( fileIn ) {
@@ -465,45 +497,7 @@ class FAU_Profile_Page {
 						var reader = new FileReader();
 						reader.onload = function (e) { preview.src = e.target.result; };
 						reader.readAsDataURL(file);
-					});
-				}
-
-				if ( form ) {
-					form.addEventListener('submit', function (e) {
-						e.preventDefault();
-						if ( ! fileIn || ! fileIn.files || ! fileIn.files[0] ) {
-							setMessage(<?php echo wp_json_encode( __( 'Please choose an image first.', 'friendly-avatar-uploader' ) ); ?>, 'error');
-							return;
-						}
-						var data = new FormData(form);
-						submit.disabled = true;
-						setMessage(<?php echo wp_json_encode( __( 'Uploading…', 'friendly-avatar-uploader' ) ); ?>, '');
-
-						fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body: data })
-							.then(function (r) { return r.json(); })
-							.then(function (res) {
-								submit.disabled = false;
-								if ( res && res.success && res.data && res.data.url ) {
-									preview.src = res.data.url;
-									setMessage(res.data.message || '', 'success');
-									fileIn.value = '';
-									if ( ! root.querySelector('.fau-profile-page__remove') ) {
-										var rm = document.createElement('button');
-										rm.type = 'button';
-										rm.className = 'fau-profile-page__btn fau-profile-page__btn--secondary fau-profile-page__remove';
-										rm.textContent = <?php echo wp_json_encode( __( 'Remove', 'friendly-avatar-uploader' ) ); ?>;
-										actions.appendChild(rm);
-										bindRemove(rm);
-									}
-								} else {
-									var errMsg = (res && res.data && res.data.message) ? res.data.message : <?php echo wp_json_encode( __( 'Upload failed.', 'friendly-avatar-uploader' ) ); ?>;
-									setMessage(errMsg, 'error');
-								}
-							})
-							.catch(function () {
-								submit.disabled = false;
-								setMessage(<?php echo wp_json_encode( __( 'Network error. Please try again.', 'friendly-avatar-uploader' ) ); ?>, 'error');
-							});
+						startUpload();
 					});
 				}
 

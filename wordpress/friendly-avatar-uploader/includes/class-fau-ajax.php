@@ -22,9 +22,6 @@ class FAU_Ajax {
 		add_action( 'wp_ajax_fau_upload_avatar', array( $this, 'handle_upload' ) );
 		add_action( 'wp_ajax_fau_remove_avatar', array( $this, 'handle_remove' ) );
 		add_action( 'delete_user', array( $this, 'handle_user_deletion' ) );
-		if ( is_multisite() ) {
-			add_action( 'remove_user_from_blog', array( $this, 'handle_user_deletion' ) );
-		}
 	}
 
 	/**

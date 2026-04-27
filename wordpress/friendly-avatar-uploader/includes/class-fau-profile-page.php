@@ -192,9 +192,9 @@ class FAU_Profile_Page {
 
 				<div class="fau-profile-page__panel">
 					<div class="fau-profile-page__actions">
-						<label for="<?php echo esc_attr( $file_id ); ?>" class="fau-profile-page__btn fau-profile-page__btn--primary">
+						<button type="button" class="fau-profile-page__btn fau-profile-page__btn--primary" data-fau-file-target="<?php echo esc_attr( $file_id ); ?>">
 							<?php esc_html_e( 'Upload Avatar', 'friendly-avatar-uploader' ); ?>
-						</label>
+						</button>
 						<?php if ( $has_custom ) : ?>
 							<button type="button" class="fau-profile-page__btn fau-profile-page__btn--secondary fau-profile-page__remove">
 								<?php esc_html_e( 'Remove', 'friendly-avatar-uploader' ); ?>
@@ -449,6 +449,7 @@ class FAU_Profile_Page {
 				var preview = root.querySelector('.fau-profile-page__avatar');
 				var msg     = root.querySelector('.fau-profile-page__message');
 				var actions = root.querySelector('.fau-profile-page__actions');
+				var upload  = root.querySelector('.fau-profile-page__btn--primary');
 
 				function setMessage(text, kind) {
 					if ( ! msg ) { return; }
@@ -457,16 +458,21 @@ class FAU_Profile_Page {
 					if ( kind ) { msg.classList.add('is-' + kind); }
 				}
 
+				function setBusy(busy) {
+					if ( upload ) { upload.disabled = !! busy; }
+					if ( fileIn ) { fileIn.disabled = !! busy; }
+				}
+
 				function startUpload() {
 					if ( ! form || ! fileIn || ! fileIn.files || ! fileIn.files[0] ) { return; }
 					var data = new FormData(form);
-					fileIn.disabled = true;
+					setBusy(true);
 					setMessage(<?php echo wp_json_encode( __( 'Uploading…', 'friendly-avatar-uploader' ) ); ?>, '');
 
 					fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body: data })
 						.then(function (r) { return r.json(); })
 						.then(function (res) {
-							fileIn.disabled = false;
+							setBusy(false);
 							if ( res && res.success && res.data && res.data.url ) {
 								preview.src = res.data.url;
 								setMessage(res.data.message || '', 'success');
@@ -481,13 +487,22 @@ class FAU_Profile_Page {
 								}
 							} else {
 								var errMsg = (res && res.data && res.data.message) ? res.data.message : <?php echo wp_json_encode( __( 'Upload failed.', 'friendly-avatar-uploader' ) ); ?>;
+								fileIn.value = '';
 								setMessage(errMsg, 'error');
 							}
 						})
 						.catch(function () {
-							fileIn.disabled = false;
+							setBusy(false);
+							fileIn.value = '';
 							setMessage(<?php echo wp_json_encode( __( 'Network error. Please try again.', 'friendly-avatar-uploader' ) ); ?>, 'error');
 						});
+				}
+
+				if ( upload && fileIn ) {
+					upload.addEventListener('click', function () {
+						if ( upload.disabled ) { return; }
+						fileIn.click();
+					});
 				}
 
 				if ( fileIn ) {

@@ -21,6 +21,23 @@ class FAU_Ajax {
 	public function __construct() {
 		add_action( 'wp_ajax_fau_upload_avatar', array( $this, 'handle_upload' ) );
 		add_action( 'wp_ajax_fau_remove_avatar', array( $this, 'handle_remove' ) );
+		add_action( 'delete_user', array( $this, 'handle_user_deletion' ) );
+	}
+
+	/**
+	 * Deletes the user's custom avatar file and meta when their account is removed.
+	 *
+	 * @param int $user_id The ID of the user being deleted.
+	 */
+	public function handle_user_deletion( int $user_id ): void {
+		$upload_dir = wp_upload_dir();
+		$old_url    = get_user_meta( $user_id, FAU_META_KEY, true );
+
+		if ( ! empty( $old_url ) && ! empty( $upload_dir['basedir'] ) ) {
+			$this->delete_old_avatar_files( $user_id, '' );
+		}
+
+		delete_user_meta( $user_id, FAU_META_KEY );
 	}
 
 	/**

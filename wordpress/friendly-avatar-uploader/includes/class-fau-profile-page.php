@@ -153,14 +153,14 @@ class FAU_Profile_Page {
 						alt="<?php echo esc_attr( sprintf( /* translators: %s: user display name. */ __( 'Avatar for %s', 'friendly-avatar-uploader' ), $display_name ) ); ?>"
 					/>
 					<span class="fau-profile-page__camera" aria-hidden="true">&#128247;</span>
+					<input
+						id="<?php echo esc_attr( $file_id ); ?>"
+						type="file"
+						name="fau_avatar"
+						class="fau-profile-page__file"
+						accept="image/jpeg,image/png,image/gif,image/webp"
+					/>
 				</label>
-				<input
-					id="<?php echo esc_attr( $file_id ); ?>"
-					type="file"
-					name="fau_avatar"
-					class="fau-profile-page__file"
-					accept="image/jpeg,image/png,image/gif,image/webp"
-				/>
 
 				<h2 class="fau-profile-page__name"><?php echo esc_html( $display_name ); ?></h2>
 				<p class="fau-profile-page__username">@<?php echo esc_html( $user_login ); ?></p>
@@ -267,6 +267,10 @@ class FAU_Profile_Page {
 				transition: transform 0.2s ease;
 			}
 			.fau-profile-page .fau-profile-page__avatar-label:hover { transform: scale(1.02); }
+			.fau-profile-page .fau-profile-page__avatar-label:focus-within {
+				outline: 2px solid var(--fau-accent);
+				outline-offset: 4px;
+			}
 			.fau-profile-page .fau-profile-page__avatar {
 				display: block;
 				width: 100%;
@@ -603,11 +607,12 @@ class FAU_Profile_Page {
 	 * @return array
 	 */
 	public function sanitize_options( $input ) {
+		$input    = is_array( $input ) ? $input : array();
 		$out      = array();
 		$fallback = $this->fallback_defaults();
 		$keys     = array( 'accent', 'bg_from', 'bg_to', 'text_color', 'muted_color' );
 		foreach ( $keys as $key ) {
-			$value     = isset( $input[ $key ] ) ? sanitize_hex_color( (string) $input[ $key ] ) : '';
+			$value       = isset( $input[ $key ] ) ? sanitize_hex_color( (string) $input[ $key ] ) : '';
 			$out[ $key ] = $value ? $value : $fallback[ $key ];
 		}
 		return $out;

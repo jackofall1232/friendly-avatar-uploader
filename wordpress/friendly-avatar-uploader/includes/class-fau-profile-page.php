@@ -124,7 +124,8 @@ class FAU_Profile_Page {
 		$has_custom = ! empty( $custom_url );
 
 		$accent_rgb = $this->hex_to_rgb_triplet( $accent );
-		$file_id    = 'fau-profile-file-' . wp_unique_id();
+		$uid        = uniqid( 'fau_' );
+		$file_id    = 'fau-profile-file-' . $uid;
 		$ajax_url   = admin_url( 'admin-ajax.php' );
 
 		$inline_vars = sprintf(
@@ -139,7 +140,7 @@ class FAU_Profile_Page {
 
 		ob_start();
 		?>
-		<section class="fau-profile-page" style="<?php echo esc_attr( $inline_vars ); ?>">
+		<section class="fau-profile-page" style="<?php echo esc_attr( $inline_vars ); ?>" data-fau-uid="<?php echo esc_attr( $uid ); ?>">
 			<?php echo $this->styles(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
 			<form class="fau-profile-page__form" enctype="multipart/form-data">
@@ -205,6 +206,7 @@ class FAU_Profile_Page {
 				</div>
 			</form>
 
+			<?php echo FAU_Shortcode::fau_crop_modal_html( $uid ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			<?php echo $this->script( $ajax_url ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 		</section>
 		<?php
@@ -410,6 +412,77 @@ class FAU_Profile_Page {
 			}
 			.fau-profile-page .fau-profile-page__message.is-success { color: #5ee08a; }
 			.fau-profile-page .fau-profile-page__message.is-error { color: #ff6b6b; }
+
+			.fau-crop-modal {
+				position: fixed;
+				inset: 0;
+				z-index: 99999;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			.fau-crop-modal[hidden] { display: none; }
+			.fau-crop-modal__backdrop {
+				position: absolute;
+				inset: 0;
+				background: rgba(0,0,0,0.82);
+				cursor: pointer;
+			}
+			.fau-crop-modal__box {
+				position: relative;
+				background: #1a1a1a;
+				border: 1px solid rgba(255,255,255,0.12);
+				border-radius: 8px;
+				padding: 1.5rem;
+				max-width: 480px;
+				width: 94vw;
+				z-index: 1;
+				display: flex;
+				flex-direction: column;
+				gap: 1rem;
+			}
+			.fau-crop-modal__title {
+				margin: 0;
+				font-size: 1.1rem;
+				color: #f0f0f0;
+				text-align: center;
+			}
+			.fau-crop-modal__stage {
+				width: 100%;
+				max-height: 340px;
+				overflow: hidden;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				position: relative;
+			}
+			.fau-crop-modal__stage .jcrop-holder { margin: 0 auto; }
+			.fau-crop-modal__img { max-width: 100%; max-height: 340px; display: block; }
+			.fau-crop-modal__hint {
+				margin: 0;
+				font-size: 0.8rem;
+				color: #888;
+				text-align: center;
+			}
+			.fau-crop-modal__actions {
+				display: flex;
+				gap: .5rem;
+				justify-content: center;
+			}
+			.fau-crop-btn {
+				padding: .5rem 1.4rem;
+				border: none;
+				border-radius: 4px;
+				font-size: .9rem;
+				font-weight: 600;
+				cursor: pointer;
+				letter-spacing: .05em;
+				text-transform: uppercase;
+				transition: opacity .15s;
+			}
+			.fau-crop-btn:hover { opacity: .85; }
+			.fau-profile-page .fau-crop-btn--confirm { background: var(--fau-accent); color: #fff; }
+			.fau-crop-btn--cancel  { background: #333; color: #ccc; }
 		</style>
 		<?php
 		return ob_get_clean();
@@ -437,8 +510,10 @@ class FAU_Profile_Page {
 		(function () {
 			var roots = document.querySelectorAll('.fau-profile-page');
 			if ( ! roots.length ) { return; }
-			var ajaxUrl    = <?php echo wp_json_encode( $ajax_url ); ?>;
+			var ajaxUrl     = <?php echo wp_json_encode( $ajax_url ); ?>;
 			var removeNonce = <?php echo wp_json_encode( wp_create_nonce( 'fau_remove_avatar' ) ); ?>;
+			var targetSize  = <?php echo (int) FAU_TARGET_SIZE; ?>;
+			var $           = ( typeof window.jQuery !== 'undefined' ) ? window.jQuery : null;
 
 			roots.forEach(function (root) {
 				if ( root.dataset.fauProfileBound ) { return; }
@@ -450,6 +525,15 @@ class FAU_Profile_Page {
 				var msg     = root.querySelector('.fau-profile-page__message');
 				var actions = root.querySelector('.fau-profile-page__actions');
 				var upload  = root.querySelector('.fau-profile-page__btn--primary');
+
+				var modal      = root.querySelector('.fau-crop-modal');
+				var modalImg   = modal ? modal.querySelector('.fau-crop-modal__img') : null;
+				var btnConfirm = modal ? modal.querySelector('.fau-crop-btn--confirm') : null;
+				var btnCancel  = modal ? modal.querySelector('.fau-crop-btn--cancel') : null;
+				var backdrop   = modal ? modal.querySelector('.fau-crop-modal__backdrop') : null;
+				var nonceField = form ? form.querySelector('input[name="fau_nonce"]') : null;
+				var jcropApi   = null;
+				var jcropSel   = null;
 
 				function setMessage(text, kind) {
 					if ( ! msg ) { return; }
@@ -463,9 +547,13 @@ class FAU_Profile_Page {
 					if ( fileIn ) { fileIn.disabled = !! busy; }
 				}
 
-				function startUpload() {
-					if ( ! form || ! fileIn || ! fileIn.files || ! fileIn.files[0] ) { return; }
-					var data = new FormData(form);
+				function uploadBlob(blob, previewUrl) {
+					if ( previewUrl && preview ) { preview.src = previewUrl; }
+					var data = new FormData();
+					data.append('action', 'fau_upload_avatar');
+					if ( nonceField ) { data.append('fau_nonce', nonceField.value); }
+					data.append('fau_avatar', blob, 'avatar-crop.jpg');
+
 					setBusy(true);
 					setMessage(<?php echo wp_json_encode( __( 'Uploading…', 'friendly-avatar-uploader' ) ); ?>, '');
 
@@ -474,9 +562,10 @@ class FAU_Profile_Page {
 						.then(function (res) {
 							setBusy(false);
 							if ( res && res.success && res.data && res.data.url ) {
-								preview.src = res.data.url;
+								var url = res.data.url;
+								preview.src = url + ( url.indexOf('?') === -1 ? '?' : '&' ) + 't=' + Date.now();
 								setMessage(res.data.message || '', 'success');
-								fileIn.value = '';
+								if ( fileIn ) { fileIn.value = ''; }
 								if ( ! root.querySelector('.fau-profile-page__remove') ) {
 									var rm = document.createElement('button');
 									rm.type = 'button';
@@ -487,15 +576,81 @@ class FAU_Profile_Page {
 								}
 							} else {
 								var errMsg = (res && res.data && res.data.message) ? res.data.message : <?php echo wp_json_encode( __( 'Upload failed.', 'friendly-avatar-uploader' ) ); ?>;
-								fileIn.value = '';
+								if ( fileIn ) { fileIn.value = ''; }
 								setMessage(errMsg, 'error');
 							}
 						})
 						.catch(function () {
 							setBusy(false);
-							fileIn.value = '';
+							if ( fileIn ) { fileIn.value = ''; }
 							setMessage(<?php echo wp_json_encode( __( 'Network error. Please try again.', 'friendly-avatar-uploader' ) ); ?>, 'error');
 						});
+				}
+
+				function openModal(dataUrl) {
+					modalImg.onload = function () {
+						modal.removeAttribute('hidden');
+						$(modalImg).Jcrop(
+							{
+								aspectRatio: 1,
+								bgColor: '#000',
+								onSelect: function (c) { jcropSel = c; },
+								onChange: function (c) { jcropSel = c; }
+							},
+							function () {
+								jcropApi = this;
+								var w = modalImg.width;
+								var h = modalImg.height;
+								var size = Math.min(w, h) * 0.8;
+								var x = (w - size) / 2;
+								var y = (h - size) / 2;
+								jcropApi.setSelect([x, y, x + size, y + size]);
+							}
+						);
+					};
+					modalImg.src = dataUrl;
+				}
+
+				function closeModal() {
+					if ( jcropApi ) {
+						try { jcropApi.destroy(); } catch (e) {}
+						jcropApi = null;
+					}
+					jcropSel = null;
+					if ( modal ) { modal.setAttribute('hidden', ''); }
+					if ( modalImg ) { modalImg.removeAttribute('src'); }
+				}
+
+				function applyCrop() {
+					if ( ! modalImg || ! jcropSel ) { closeModal(); return; }
+					var coords = jcropSel;
+					var canvas = document.createElement('canvas');
+					canvas.width  = targetSize;
+					canvas.height = targetSize;
+					var ctx = canvas.getContext('2d');
+					var scaleX = modalImg.naturalWidth  / modalImg.width;
+					var scaleY = modalImg.naturalHeight / modalImg.height;
+					ctx.drawImage(
+						modalImg,
+						coords.x * scaleX, coords.y * scaleY,
+						coords.w * scaleX, coords.h * scaleY,
+						0, 0, targetSize, targetSize
+					);
+					var previewUrl = canvas.toDataURL('image/jpeg', 0.92);
+					canvas.toBlob(function (blob) {
+						closeModal();
+						if ( ! blob ) {
+							if ( fileIn ) { fileIn.value = ''; }
+							setMessage(<?php echo wp_json_encode( __( 'Could not process the image.', 'friendly-avatar-uploader' ) ); ?>, 'error');
+							return;
+						}
+						uploadBlob(blob, previewUrl);
+					}, 'image/jpeg', 0.92);
+				}
+
+				function cancelCrop() {
+					closeModal();
+					if ( fileIn ) { fileIn.value = ''; }
 				}
 
 				if ( upload && fileIn ) {
@@ -510,11 +665,55 @@ class FAU_Profile_Page {
 						var file = fileIn.files && fileIn.files[0];
 						if ( ! file ) { return; }
 						var reader = new FileReader();
-						reader.onload = function (e) { preview.src = e.target.result; };
+						reader.onload = function (e) {
+							if ( $ && modal && modalImg ) {
+								openModal(e.target.result);
+							} else {
+								// Fallback: no Jcrop available, send original
+								// file to the existing endpoint and let the
+								// server-side resize() safety net square it.
+								if ( preview ) { preview.src = e.target.result; }
+								if ( ! form ) { return; }
+								var data = new FormData(form);
+								setBusy(true);
+								setMessage(<?php echo wp_json_encode( __( 'Uploading…', 'friendly-avatar-uploader' ) ); ?>, '');
+								fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body: data })
+									.then(function (r) { return r.json(); })
+									.then(function (res) {
+										setBusy(false);
+										if ( res && res.success && res.data && res.data.url ) {
+											var url = res.data.url;
+											preview.src = url + ( url.indexOf('?') === -1 ? '?' : '&' ) + 't=' + Date.now();
+											setMessage(res.data.message || '', 'success');
+											fileIn.value = '';
+											if ( ! root.querySelector('.fau-profile-page__remove') ) {
+												var rm = document.createElement('button');
+												rm.type = 'button';
+												rm.className = 'fau-profile-page__btn fau-profile-page__btn--secondary fau-profile-page__remove';
+												rm.textContent = <?php echo wp_json_encode( __( 'Remove', 'friendly-avatar-uploader' ) ); ?>;
+												actions.appendChild(rm);
+												bindRemove(rm);
+											}
+										} else {
+											var errMsg = (res && res.data && res.data.message) ? res.data.message : <?php echo wp_json_encode( __( 'Upload failed.', 'friendly-avatar-uploader' ) ); ?>;
+											fileIn.value = '';
+											setMessage(errMsg, 'error');
+										}
+									})
+									.catch(function () {
+										setBusy(false);
+										fileIn.value = '';
+										setMessage(<?php echo wp_json_encode( __( 'Network error. Please try again.', 'friendly-avatar-uploader' ) ); ?>, 'error');
+									});
+							}
+						};
 						reader.readAsDataURL(file);
-						startUpload();
 					});
 				}
+
+				if ( btnConfirm ) { btnConfirm.addEventListener('click', applyCrop); }
+				if ( btnCancel )  { btnCancel.addEventListener('click', cancelCrop); }
+				if ( backdrop )   { backdrop.addEventListener('click', cancelCrop); }
 
 				function bindRemove(btn) {
 					btn.addEventListener('click', function () {

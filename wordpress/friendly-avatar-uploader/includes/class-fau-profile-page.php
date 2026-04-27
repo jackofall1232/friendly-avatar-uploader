@@ -457,7 +457,7 @@ class FAU_Profile_Page {
 				position: relative;
 			}
 			.fau-crop-modal__stage .jcrop-holder { margin: 0 auto; }
-			.fau-crop-modal__img { max-width: 100%; max-height: 340px; display: block; }
+			.fau-crop-modal__img { max-width: 100%; max-height: 340px; height: auto; display: block; }
 			.fau-crop-modal__hint {
 				margin: 0;
 				font-size: 0.8rem;
@@ -534,7 +534,6 @@ class FAU_Profile_Page {
 				var backdrop   = modal ? modal.querySelector('.fau-crop-modal__backdrop') : null;
 				var nonceField = form ? form.querySelector('input[name="fau_nonce"]') : null;
 				var jcropApi   = null;
-				var jcropSel   = null;
 
 				function setMessage(text, kind) {
 					if ( ! msg ) { return; }
@@ -591,21 +590,21 @@ class FAU_Profile_Page {
 				function openModal(dataUrl) {
 					modalImg.onload = function () {
 						modal.removeAttribute('hidden');
+						var imgW = modalImg.width;
+						var imgH = modalImg.height;
+						var selSize = Math.round( Math.min(imgW, imgH) * 0.8 );
+						var selX = Math.round( (imgW - selSize) / 2 );
+						var selY = Math.round( (imgH - selSize) / 2 );
+
 						$(modalImg).Jcrop(
 							{
 								aspectRatio: 1,
-								bgColor: '#000',
-								onSelect: function (c) { jcropSel = c; },
-								onChange: function (c) { jcropSel = c; }
+								setSelect: [ selX, selY, selX + selSize, selY + selSize ],
+								bgColor: 'black',
+								bgOpacity: 0.5
 							},
 							function () {
 								jcropApi = this;
-								var w = modalImg.width;
-								var h = modalImg.height;
-								var size = Math.min(w, h) * 0.8;
-								var x = (w - size) / 2;
-								var y = (h - size) / 2;
-								jcropApi.setSelect([x, y, x + size, y + size]);
 							}
 						);
 					};
@@ -617,20 +616,26 @@ class FAU_Profile_Page {
 						try { jcropApi.destroy(); } catch (e) {}
 						jcropApi = null;
 					}
-					jcropSel = null;
 					if ( modal ) { modal.setAttribute('hidden', ''); }
 					if ( modalImg ) { modalImg.removeAttribute('src'); }
 				}
 
 				function applyCrop() {
-					if ( ! modalImg || ! jcropSel ) { closeModal(); return; }
-					var coords = jcropSel;
+					if ( ! modalImg || ! jcropApi ) { closeModal(); return; }
+					var coords = jcropApi.tellSelect();
+					if ( ! coords || ! coords.w ) { closeModal(); return; }
+
+					var naturalW = modalImg.naturalWidth;
+					var naturalH = modalImg.naturalHeight;
+					var displayW = modalImg.width;
+					var displayH = modalImg.height;
+					var scaleX   = naturalW / displayW;
+					var scaleY   = naturalH / displayH;
+
 					var canvas = document.createElement('canvas');
 					canvas.width  = targetSize;
 					canvas.height = targetSize;
 					var ctx = canvas.getContext('2d');
-					var scaleX = modalImg.naturalWidth  / modalImg.width;
-					var scaleY = modalImg.naturalHeight / modalImg.height;
 					ctx.drawImage(
 						modalImg,
 						coords.x * scaleX, coords.y * scaleY,

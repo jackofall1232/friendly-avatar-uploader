@@ -275,6 +275,7 @@ class FAU_Shortcode {
 			var ajaxUrl    = <?php echo wp_json_encode( $ajax_url ); ?>;
 			var targetSize = <?php echo (int) FAU_TARGET_SIZE; ?>;
 			var $          = ( typeof window.jQuery !== 'undefined' ) ? window.jQuery : null;
+			var hasJcrop   = !! ( $ && $.fn && $.fn.Jcrop );
 
 			roots.forEach(function (root) {
 				if ( root.dataset.fauBound ) { return; }
@@ -415,7 +416,7 @@ class FAU_Shortcode {
 						if ( ! file ) { return; }
 						var reader = new FileReader();
 						reader.onload = function (e) {
-							if ( $ && modal && modalImg ) {
+							if ( hasJcrop && modal && modalImg ) {
 								openModal(e.target.result);
 							} else {
 								preview.src = e.target.result;

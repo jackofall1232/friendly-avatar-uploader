@@ -514,6 +514,7 @@ class FAU_Profile_Page {
 			var removeNonce = <?php echo wp_json_encode( wp_create_nonce( 'fau_remove_avatar' ) ); ?>;
 			var targetSize  = <?php echo (int) FAU_TARGET_SIZE; ?>;
 			var $           = ( typeof window.jQuery !== 'undefined' ) ? window.jQuery : null;
+			var hasJcrop    = !! ( $ && $.fn && $.fn.Jcrop );
 
 			roots.forEach(function (root) {
 				if ( root.dataset.fauProfileBound ) { return; }
@@ -666,7 +667,7 @@ class FAU_Profile_Page {
 						if ( ! file ) { return; }
 						var reader = new FileReader();
 						reader.onload = function (e) {
-							if ( $ && modal && modalImg ) {
+							if ( hasJcrop && modal && modalImg ) {
 								openModal(e.target.result);
 							} else {
 								// Fallback: no Jcrop available, send original

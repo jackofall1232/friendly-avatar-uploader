@@ -536,8 +536,6 @@ class FAU_Profile_Page {
 				var jcropApi   = null;
 				var srcNaturalW = 0;
 				var srcNaturalH = 0;
-				var srcDisplayW = 0;
-				var srcDisplayH = 0;
 
 				function setMessage(text, kind) {
 					if ( ! msg ) { return; }
@@ -596,10 +594,8 @@ class FAU_Profile_Page {
 						modal.removeAttribute('hidden');
 						srcNaturalW = modalImg.naturalWidth;
 						srcNaturalH = modalImg.naturalHeight;
-						srcDisplayW = modalImg.width || modalImg.offsetWidth;
-						srcDisplayH = modalImg.height || modalImg.offsetHeight;
-						var imgW = srcDisplayW;
-						var imgH = srcDisplayH;
+						var imgW = modalImg.width || modalImg.offsetWidth;
+						var imgH = modalImg.height || modalImg.offsetHeight;
 						var selSize = Math.round( Math.min(imgW, imgH) * 0.8 );
 						var selX = Math.round( (imgW - selSize) / 2 );
 						var selY = Math.round( (imgH - selSize) / 2 );
@@ -626,8 +622,6 @@ class FAU_Profile_Page {
 					}
 					srcNaturalW = 0;
 					srcNaturalH = 0;
-					srcDisplayW = 0;
-					srcDisplayH = 0;
 					if ( modal ) { modal.setAttribute('hidden', ''); }
 					if ( modalImg ) { modalImg.removeAttribute('src'); }
 				}
